@@ -9,25 +9,32 @@ class Switch(object):
         self.hostname = hostname
         self.username = username
         self.password = password
-        self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    def execute_command(self, command, timeout = 5):
+        # Establish a new SSH connection to the switch.
+
+        # TODO: what happens if the connection drops?
+        self._ssh_connection = paramiko.SSHClient()
+        self._ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self._ssh_connection.connect(self.hostname,
+                username=self.username, password=self.password,
+                allow_agent=False)
+        # Request a new pseudo-terminal and immediately resize it to something huge. Else, the switch will try to make
+        # the output scrollable with a keyboard, which is somewhat hard to emulate in code.
+        self._ssh_pty = self._ssh_connection.invoke_shell()
+        self._ssh_pty.resize_pty(width = 1000000, height=1000000)
+        # Receive the annoying HP welcome message and skip it immediately.
+        self._ssh_pty.recv(9000)
+        self._ssh_pty.send('\n')
+        self._ssh_pty.recv(9000)
+
+    def execute_command(self, command, timeout=5):
         """
         Execute a command on the switch using the SSH protocol.
         Returns the output of the command.
         """
-        self.ssh.connect(self.hostname, username=self.username, password=self.password, allow_agent=False)
-        channel = self.ssh.invoke_shell()
-        # get a big-ass pty - we do not want to emulate scrolling
-        channel.resize_pty(width = 1000000, height=1000000)
-        channel.settimeout(timeout)
-        # skip the welcome message
-        channel.recv(9000)
-        channel.send('\n')
-        channel.recv(9000)
-        # execute the desired command
-        channel.send(command + '\n')
+        # Set the timout for the SSH channel to return the command output and run the desired command.
+        self._ssh_pty.settimeout(timeout)
+        self._ssh_pty.send(command + '\n')
 
         recv_buffer = ''
         while True:
