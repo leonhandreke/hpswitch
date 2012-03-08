@@ -2,10 +2,10 @@ import paramiko
 import re
 
 class Switch(object):
+    """
+    Represents a generic HP Networking switch.
+    """
     def __init__(self, hostname, username, password):
-        """
-        Construct a new Switch instance.
-        """
         self.hostname = hostname
         self.username = username
         self.password = password
@@ -30,6 +30,10 @@ class Switch(object):
     def execute_command(self, command, timeout=5):
         """
         Execute a command on the switch using the SSH protocol.
+
+        The `timeout` given in seconds dictates how long this method should wait for the switch to send the command
+        output before raising a `socket.timeout` exception.
+
         Returns the output of the command.
         """
         # Set the timout for the SSH channel to return the command output and run the desired command.
@@ -38,22 +42,21 @@ class Switch(object):
 
         recv_buffer = ''
         while True:
-            # receive lots of bytes
-            recv_buffer += channel.recv(1000000)
-            # clean up the vt100 control sequences
-            # http://mail.python.org/pipermail/python-list/2009-September/607067.html
+            # Receive lots of bytes so that in most cases, another `recv()` call is not required.
+            recv_buffer += self._ssh_pty.recv(1000000)
+            # Clean up the vt100 control sequences that the switch inserts. The regular expression is stolen from a
+            # thread on [python-list](http://mail.python.org/pipermail/python-list/2009-September/1219674.html).
             recv_buffer = re.sub("\x1B[^A-Za-z]*?[A-Za-z]", '', recv_buffer)
-            # see if the buffer ends with a shell prompt
-            # TODO: figure out a better heuristic to detect the end of the command
+            # Check if the received string ends with a `# ` shell-prompt. If so, it's pretty safe to assume that the
+            # command has finished executing and all desired output has been received.
             if recv_buffer.endswith('# '):
-                # strip off the first and the last line; The first one
-                # contains the repeated command, the last one the prompt
-                recv_buffer = re.sub(r"^.*?\r\n", "", recv_buffer)
-                recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
-                # exit the loop - we've read enough
                 break
 
-        # close the ssh connection to the switch
-        self.ssh.close()
+        # Strip off the first and the last line. The first line contains the command that was echoed to the
+        # pseudo-terminal again, the last line contains the shell prompt.
+        # contains the repeated command, the last one the prompt
+        recv_buffer = re.sub(r"^.*?\r\n", "", recv_buffer)
+        recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
+
         return recv_buffer
 
