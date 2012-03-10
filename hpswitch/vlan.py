@@ -133,3 +133,27 @@ class VLAN(object):
 
         # Update the internally-cached collection of interfaces on this VLAN
         self._ipv4_interfaces.append(interface)
+
+    def remove_ipv4_interface(self, interface):
+        """
+        Remove the given IPv4 interface from the VLAN.
+        """
+        # Check if the interface is even configured on this VLAN. If it's not configured, we don't even have to bother
+        # asking the switch to remove it.
+        if interface not in self.ipv4_interfaces:
+            raise Exception("The interface {0} is not configured on this VLAN.".format(interface.with_prefixlen))
+
+        self.switch.execute_command('config')
+        remove_output = self.switch.execute_command('no vlan {0} ip address {1}'.format(self.vid, interface.with_prefixlen))
+        self.switch.execute_command('exit')
+
+        # Check if the interface that we thought would be configured on this VLAN was successfully removed or if it
+        # didn't even exist and our `ipv4_interfaces` list was inconsistent.
+        if remove_output == "The IP address {0} is not configured on this VLAN.".format(interface.with_prefixlen):
+            self._ipv4_interfaces.remove(interface)
+            raise SwitchCacheInconsistencyError("The IPv4 interface {0} could not be removed because it is not " \
+                    "configured on this VLAN.".format(interface.with_prefixlen))
+
+
+        # Update the internally-cached collection of interfaces on this VLAN
+        self._ipv4_interfaces.remove(interface)
