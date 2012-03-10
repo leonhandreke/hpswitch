@@ -52,10 +52,8 @@ class Switch(object):
             if recv_buffer.endswith('# '):
                 break
 
-        # Strip off the first and the last line. The first line contains the command that was echoed to the
-        # pseudo-terminal again, the last line contains the shell prompt.
-        # contains the repeated command, the last one the prompt
-        recv_buffer = re.sub(r"^.*?\r\n", "", recv_buffer)
+        # Strip off the command entered command at the beginning and the last line containing the shell prompt
+        recv_buffer = re.sub(r"^" + command, "", recv_buffer)
         recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
 
         return recv_buffer
