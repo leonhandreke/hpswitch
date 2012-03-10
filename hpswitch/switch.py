@@ -58,3 +58,5 @@ class Switch(object):
 
         return recv_buffer
 
+class SwitchCacheInconsistencyError(Exception):
+    pass
