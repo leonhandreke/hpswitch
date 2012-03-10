@@ -102,3 +102,21 @@ class VLAN(object):
         The IPv4 addresses configured, together with their netmasks called "interfaces" configured on this VLAN.
         """
         return self._ipv4_interfaces
+
+    def add_ipv4_interface(self, interface):
+        """
+        Add the given IPv4 interface to the VLAN.
+        """
+        self.switch.execute_command('config')
+        # Pass the address to the switch in the CIDR-notation that can be obtained using `with_prefixlen`.
+        add_output = self.switch.execute_command('vlan {0} ip address {1}'.format(self.vid, interface.with_prefixlen))
+        self.switch.execute_command('exit')
+
+        # HP switches seem to be somewhat picky about the IPv4 addresses they like to assign to interfaces. For example,
+        # running `vlan 1001 ip address 192.168.1.1/32` results in the output `192.168.1.1/32: bad IP address.`.
+        # Therefore, we try to catch the worst things that could happen here.
+        if "bad IP address" in add_output:
+            raise Exception("IPv4 address {0} deemed \"bad\" by switch.".format(interface.with_prefixlen))
+
+        # Update the internally-cached collection of interfaces on this VLAN
+        self._ipv4_interfaces.append(interface)
