@@ -1,6 +1,8 @@
 import re
 import ipaddress
 
+from switch import SwitchCacheInconsistencyError
+
 class VLAN(object):
     """
     Represents a 802.1Q VLAN.
@@ -107,8 +109,12 @@ class VLAN(object):
         """
         Add the given IPv4 interface to the VLAN.
         """
+        # Check if the interface is already configured on this VLAN. If it is already configured, we don't even have to
+        # bother asking the switch to configure it *again*.
+        if interface in self.ipv4_interfaces:
+            raise Exception("The interface {0} is already configured on this VLAN.".format(interface.with_prefixlen))
+
         self.switch.execute_command('config')
-        # Pass the address to the switch in the CIDR-notation that can be obtained using `with_prefixlen`.
         add_output = self.switch.execute_command('vlan {0} ip address {1}'.format(self.vid, interface.with_prefixlen))
         self.switch.execute_command('exit')
 
@@ -117,6 +123,13 @@ class VLAN(object):
         # Therefore, we try to catch the worst things that could happen here.
         if "bad IP address" in add_output:
             raise Exception("IPv4 address {0} deemed \"bad\" by switch.".format(interface.with_prefixlen))
+
+        # Check if configuring the interface failed because the interface that we thought would not yet be configured on
+        # this VLAN was already configured on the switch.
+        if add_output == "The IP address (or subnet) {0} already exists.".format(interface.with_prefixlen):
+            self._ipv4_interfaces.append(interface)
+            raise SwitchCacheInconsistencyError("The IPv4 interface {0} could not be configured because it was " \
+                    "already configured for this VLAN.".format(interface.with_prefixlen))
 
         # Update the internally-cached collection of interfaces on this VLAN
         self._ipv4_interfaces.append(interface)
