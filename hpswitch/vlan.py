@@ -34,8 +34,6 @@ class VLAN(object):
         # Pass the name to the switch wrapped in quotes because the name could contain spaces.
         self.switch.execute_command("vlan {0} name \"{1}\"".format(self.vid, value))
         self.switch.execute_command("exit")
-        # Update the internally-cached attribute with the newly-set value.
-        self._name = value
 
     name = property(_get_name, _set_name)
 
