@@ -101,3 +101,57 @@ class VLAN(object):
         if remove_output == "The IP address {0} is not configured on this VLAN.".format(interface.with_prefixlen):
             raise Exception("The IPv4 interface {0} could not be removed because it is not configured on this " \
             "VLAN.".format(interface.with_prefixlen))
+
+    def _get_ipv6_interfaces(self):
+        """
+        The IPv6 addresses configured, together with their netmasks called "interfaces" configured on this VLAN.
+        """
+        run_output = self.switch.execute_command("show run vlan " + str(self.vid))
+        ipv6_address_matches = re.finditer(
+                r"^   ipv6 address " \
+                        # Match the IPv6 address containing hex-digits, : and / to separate the netmask
+                        "(?P<address>[0-9abcdefABCDEF:/]+)" \
+                        "\s*$",
+                run_output, re.MULTILINE)
+
+        interfaces = []
+        for match in ipv6_address_matches:
+            interfaces.append(ipaddress.IPv6Interface(match.group('address')))
+
+        return interfaces
+
+    ipv6_interfaces = property(_get_ipv6_interfaces)
+
+    def add_ipv6_interface(self, interface):
+        """
+        Add the given IPv6 interface to the VLAN.
+        """
+        if type(interface) is not ipaddress.IPv6Interface:
+            raise TypeError("The given interface to configure is not an ipaddress.IPv6Interface.")
+
+        self.switch.execute_command('config')
+        add_output = self.switch.execute_command('vlan {0} ipv6 address {1}'.format(self.vid, interface.with_prefixlen))
+        self.switch.execute_command('exit')
+
+        # Check if configuring the interface failed because the interface that we thought would not yet be configured on
+        # this VLAN was already configured on the switch.
+        if add_output == "The IP address (or subnet) {0} already exists.".format(interface.with_prefixlen):
+            raise Exception("The IPv6 interface {0} could not be configured because it was already configured for " \
+                    "this VLAN.".format(interface.with_prefixlen))
+
+    def remove_ipv6_interface(self, interface):
+        """
+        Remove the given IPv6 interface from the VLAN.
+        """
+        if type(interface) is not ipaddress.IPv6Interface:
+            raise TypeError("The given interface to remove is not an ipaddress.IPv6Interface.")
+
+        self.switch.execute_command('config')
+        remove_output = self.switch.execute_command('no vlan {0} ipv6 address {1}'.format(self.vid, interface.with_prefixlen))
+        self.switch.execute_command('exit')
+
+        # Check if the interface that we thought would be configured on this VLAN was successfully removed or if it
+        # didn't even exist and our `ipv4_interfaces` list was inconsistent.
+        if remove_output == "The IP address {0} is not configured on this VLAN.".format(interface.with_prefixlen):
+            raise Exception("The IPv6 interface {0} could not be removed because it is not configured on this " \
+            "VLAN.".format(interface.with_prefixlen))
