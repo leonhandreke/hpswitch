@@ -17,7 +17,7 @@ class VLAN(object):
         """
         The name configured for the VLAN.
         """
-        run_output = self.switch.execute_command("show run vlan " + str(self.vid))
+        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
         # Try to extract the VLAN name, which may also contain spaces. This is achieved by greedily matching whitespace
         # at the end of the line and matching the `   name ` prefix a the beginning and using whatever remains of the
         # string as the VLAN name. The `name` group is matched in a non-greedy fashion as to not "eat up" all the
@@ -43,7 +43,7 @@ class VLAN(object):
         """
         Get the IPv4 addresses configured configured for this VLAN.
         """
-        run_output = self.switch.execute_command("show run vlan " + str(self.vid))
+        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
         ipv4_address_matches = re.finditer(
                 r"^   ip address " \
                         # Match the IPv4 address consisting of 4 groups of up to 4 digits
@@ -108,7 +108,7 @@ class VLAN(object):
         """
         Get the IPv6 addresses configured for this VLAN.
         """
-        run_output = self.switch.execute_command("show run vlan " + str(self.vid))
+        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
         ipv6_address_matches = re.finditer(
                 r"^   ipv6 address " \
                         # Match the IPv6 address containing hex-digits, : and / to separate the netmask
