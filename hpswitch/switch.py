@@ -57,6 +57,3 @@ class Switch(object):
         recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
 
         return recv_buffer
-
-class SwitchCacheInconsistencyError(Exception):
-    pass
