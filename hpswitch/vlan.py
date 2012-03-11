@@ -44,10 +44,10 @@ class VLAN(object):
         run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
         ipv4_address_matches = re.finditer(
                 r"^   ip address " \
-                        # Match the IPv4 address consisting of 4 groups of up to 4 digits
+                        # Match the IPv4 address consisting of 4 groups of up to 3 digits
                         "(?P<address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
                         " " \
-                        # Match the IPv4 netmask consisting of 4 groups of up to 4 digits
+                        # Match the IPv4 netmask consisting of 4 groups of up to 3 digits
                         "(?P<netmask>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
                         "\s*$",
                 run_output, re.MULTILINE)
