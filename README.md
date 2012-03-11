@@ -8,7 +8,7 @@ It uses [paramiko](http://www.lag.net/paramiko/) to interact with the switch usi
 
 ## Status
 
-Currently, only a very small subset of the functionality of the switch CLI is implemented.
+Currently, only a very small subset of the functionality of the switch CLI is implemented, mostly related to dealing with IP addressing and different VLANs.
 
 `hpswitch` *should* be compatible with the 3500, 3500yl, 5400zl, 6200yl, 6600 and 8200zl switch series. However, it has so far only been tested with a 5406zl switch. If you can confirm compatibility with other switch models, please let me know!
 
