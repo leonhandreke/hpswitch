@@ -66,6 +66,9 @@ class VLAN(object):
         """
         Add the given IPv4 interface to the VLAN.
         """
+        if type(interface) is not ipaddress.IPv4Interface:
+            raise TypeError("The given interface to configure is not an ipaddress.IPv4Interface.")
+
         self.switch.execute_command('config')
         add_output = self.switch.execute_command('vlan {0} ip address {1}'.format(self.vid, interface.with_prefixlen))
         self.switch.execute_command('exit')
@@ -86,6 +89,9 @@ class VLAN(object):
         """
         Remove the given IPv4 interface from the VLAN.
         """
+        if type(interface) is not ipaddress.IPv4Interface:
+            raise TypeError("The given interface to remove is not an ipaddress.IPv4Interface.")
+
         self.switch.execute_command('config')
         remove_output = self.switch.execute_command('no vlan {0} ip address {1}'.format(self.vid, interface.with_prefixlen))
         self.switch.execute_command('exit')
