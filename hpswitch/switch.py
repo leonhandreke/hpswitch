@@ -61,7 +61,14 @@ class Switch(object):
 
         return recv_buffer
 
+    # == Static route management ==
+
+    # === IPv4 static route management ===
+
     def _get_static_ipv4_routes(self):
+        """
+        Get all static IPv4 routes configured on this switch.
+        """
         run_output = self.execute_command("show running-config")
         ipv4_route_matches = re.finditer(
                 r"^ip route " \
@@ -90,6 +97,9 @@ class Switch(object):
     static_ipv4_routes = property(_get_static_ipv4_routes)
 
     def add_static_ipv4_route(self, add_route):
+        """
+        Add the static IPv4 route `add_route` to the switch configuration.
+        """
         if type(add_route) is not route.IPv4Route:
             raise Exception("Given route to add is not of type IPv4Route.")
 
@@ -98,6 +108,9 @@ class Switch(object):
         self.execute_command("exit")
 
     def remove_static_ipv4_route(self, remove_route):
+        """
+        Remove the static route `remove_route` from the switch configuration.
+        """
         if type(remove_route) is not route.IPv4Route:
             raise Exception("Given route to remove is not of type IPv4Route.")
 
@@ -110,6 +123,8 @@ class Switch(object):
         if route_output == "The route not found or not configurable.":
             raise Exception("The route {route} could not be removed because it is not configured on this " \
                     "switch.".format(route=remove_route))
+
+    # === IPv6 static route management ===
 
     def _get_static_ipv6_routes(self):
         """
