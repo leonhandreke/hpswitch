@@ -1,5 +1,8 @@
+import ipaddress
 import paramiko
 import re
+
+import route
 
 class Switch(object):
     """
@@ -57,3 +60,53 @@ class Switch(object):
         recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
 
         return recv_buffer
+
+    def _get_static_ipv4_routes(self):
+        run_output = self.execute_command("show running-config")
+        ipv4_route_matches = re.finditer(
+                r"^ip route " \
+                        # Match the IPv4 address consisting of 4 groups of up to 3 digits
+                        "(?P<destination_address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
+                        " " \
+                        # Match the IPv4 netmask consisting of 4 groups of up to 3 digits
+                        "(?P<destination_netmask>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
+                        " " \
+                        # Match the gateway address consisting of 4 groups of up to 3 digits
+                        "(?P<gateway_address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
+                        "\s*$",
+                run_output, re.MULTILINE)
+
+        routes = []
+        for match in ipv4_route_matches:
+            routes.append(
+                    route.IPv4Route(
+                        ipaddress.IPv4Network(match.group('destination_address') + '/' + match.group('destination_netmask')),
+                        ipaddress.IPv4Address(match.group('gateway_address'))
+                        )
+                    )
+
+        return routes
+
+    static_ipv4_routes = property(_get_static_ipv4_routes)
+
+    def add_static_ipv4_route(self, add_route):
+        if type(add_route) is not route.IPv4Route:
+            raise Exception("Given route to add is not of type IPv4Route.")
+
+        self.execute_command("config")
+        route_output = self.execute_command("ip route {route.destination} {route.gateway}".format(route=add_route))
+        self.execute_command("exit")
+
+    def remove_static_ipv4_route(self, remove_route):
+        if type(remove_route) is not route.IPv4Route:
+            raise Exception("Given route to remove is not of type IPv4Route.")
+
+        self.execute_command("config")
+        route_output = self.execute_command(
+                "no ip route {route.destination} {route.gateway}".format(route=remove_route)
+                )
+        self.execute_command("exit")
+
+        if route_output == "The route not found or not configurable.":
+            raise Exception("The route {route} could not be removed because it is not configured on this " \
+                    "switch.".format(route=remove_route))
