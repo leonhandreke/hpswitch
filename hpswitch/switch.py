@@ -72,7 +72,7 @@ class Switch(object):
                         "(?P<destination_netmask>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
                         " " \
                         # Match the gateway address consisting of 4 groups of up to 3 digits
-                        "(?P<gateway_address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
+                        "(?P<gateway>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
                         "\s*$",
                 run_output, re.MULTILINE)
 
@@ -81,7 +81,7 @@ class Switch(object):
             routes.append(
                     route.IPv4Route(
                         ipaddress.IPv4Network(match.group('destination_address') + '/' + match.group('destination_netmask')),
-                        ipaddress.IPv4Address(match.group('gateway_address'))
+                        ipaddress.IPv4Address(match.group('gateway'))
                         )
                     )
 
@@ -104,6 +104,62 @@ class Switch(object):
         self.execute_command("config")
         route_output = self.execute_command(
                 "no ip route {route.destination} {route.gateway}".format(route=remove_route)
+                )
+        self.execute_command("exit")
+
+        if route_output == "The route not found or not configurable.":
+            raise Exception("The route {route} could not be removed because it is not configured on this " \
+                    "switch.".format(route=remove_route))
+
+    def _get_static_ipv6_routes(self):
+        """
+        Get all static IPv6 routes configured on this switch.
+        """
+        run_output = self.execute_command("show running-config")
+        ipv6_route_matches = re.finditer(
+                r"^ipv6 route " \
+                        # Match the IPv6 address containing hex-digits, : and / to separate the netmask
+                        "(?P<destination>[0-9abcdefABCDEF:/]+)" \
+                        " " \
+                        # Match the IPv6 address of the gateway, which should not contain a /
+                        "(?P<gateway>[0-9abcdefABCDEF:]+)" \
+                        "\s*$",
+                run_output, re.MULTILINE)
+
+        routes = []
+        for match in ipv6_route_matches:
+            routes.append(
+                    route.IPv6Route(
+                        ipaddress.IPv6Network(match.group('destination')),
+                        ipaddress.IPv6Address(match.group('gateway'))
+                        )
+                    )
+
+        return routes
+
+    static_ipv6_routes = property(_get_static_ipv6_routes)
+
+    def add_static_ipv6_route(self, add_route):
+        """
+        Add the static IPv6 route `add_route` to the switch configuration.
+        """
+        if type(add_route) is not route.IPv6Route:
+            raise Exception("Given route to add is not of type IPv6Route.")
+
+        self.execute_command("config")
+        route_output = self.execute_command("ipv6 route {route.destination} {route.gateway}".format(route=add_route))
+        self.execute_command("exit")
+
+    def remove_static_ipv6_route(self, remove_route):
+        """
+        Remove the static IPv6 route `remove_route` from the switch configuration.
+        """
+        if type(remove_route) is not route.IPv6Route:
+            raise Exception("Given route to remove is not of type IPv6Route.")
+
+        self.execute_command("config")
+        route_output = self.execute_command(
+                "no ipv6 route {route.destination} {route.gateway}".format(route=remove_route)
                 )
         self.execute_command("exit")
 
