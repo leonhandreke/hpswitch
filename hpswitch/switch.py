@@ -8,19 +8,15 @@ class Switch(object):
     """
     Represents a generic HP Networking switch.
     """
-    def __init__(self, hostname, username, password):
+    def __init__(self, hostname):
         self.hostname = hostname
-        self.username = username
-        self.password = password
 
         # Establish a new SSH connection to the switch.
 
         # TODO: what happens if the connection drops?
         self._ssh_connection = paramiko.SSHClient()
         self._ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self._ssh_connection.connect(self.hostname,
-                username=self.username, password=self.password,
-                allow_agent=False)
+        self._ssh_connection.connect(self.hostname)
         # Request a new pseudo-terminal and immediately resize it to something huge. Else, the switch will try to make
         # the output scrollable with a keyboard, which is somewhat hard to emulate in code.
         self._ssh_pty = self._ssh_connection.invoke_shell()
