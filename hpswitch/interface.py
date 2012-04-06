@@ -49,3 +49,25 @@ class Interface(object):
         self.switch.execute_command("exit")
 
     name = property(_get_name, _set_name, _del_name)
+
+    def _get_enabled(self):
+        """
+        Get the admin status of this interface.
+        """
+        run_output = self.switch.execute_command("show running-config interface " + str(self.identifier))
+        disable_match = re.search(r"^   disable\s*$", run_output, re.MULTILINE)
+        # If nothing hinting at a disabled port has been matched, return True, else False.
+        return disable_match is None
+
+    def _set_enabled(self, value):
+        """
+        Set the admin status of this interface.
+        """
+        self.switch.execute_command("config")
+        if value:
+            self.switch.execute_command("interface {0} enable".format(self.identifier))
+        else:
+            self.switch.execute_command("interface {0} disable".format(self.identifier))
+        self.switch.execute_command("exit")
+
+    enabled = property(_get_enabled, _set_enabled)
