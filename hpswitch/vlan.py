@@ -8,7 +8,7 @@ class VLAN(object):
     """
     def __init__(self, switch, vid):
         """
-        Constructs a new VLAN and retrieves its attributes from the given `switch` by using the given VID.
+        Constructs a new VLAN with the given VLAN ID `vid` on the given `switch`.
         """
         self.vid = vid
         self.switch = switch
