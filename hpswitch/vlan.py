@@ -66,9 +66,6 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        if type(address) is not ipaddress.IPv4Interface:
-            raise TypeError("The given address to configure is not an ipaddress.IPv4Interface.")
-
         self.switch.execute_command('config')
         add_output = self.switch.execute_command('vlan {0} ip address {1}'.format(self.vid, address.with_prefixlen))
         self.switch.execute_command('exit')
@@ -90,9 +87,6 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        if type(address) is not ipaddress.IPv4Interface:
-            raise TypeError("The given address to remove is not an ipaddress.IPv4Interface.")
-
         self.switch.execute_command('config')
         remove_output = self.switch.execute_command('no vlan {0} ip address {1}'.format(self.vid, address.with_prefixlen))
         self.switch.execute_command('exit')
@@ -128,9 +122,6 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        if type(address) is not ipaddress.IPv6Interface:
-            raise TypeError("The given address to configure is not an ipaddress.IPv6Interface.")
-
         self.switch.execute_command('config')
         add_output = self.switch.execute_command('vlan {0} ipv6 address {1}'.format(self.vid, address.with_prefixlen))
         self.switch.execute_command('exit')
@@ -146,9 +137,6 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        if type(address) is not ipaddress.IPv6Interface:
-            raise TypeError("The given address to remove is not an ipaddress.IPv6Interface.")
-
         self.switch.execute_command('config')
         remove_output = self.switch.execute_command('no vlan {0} ipv6 address {1}'.format(self.vid, address.with_prefixlen))
         self.switch.execute_command('exit')

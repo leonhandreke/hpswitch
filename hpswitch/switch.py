@@ -96,9 +96,6 @@ class Switch(object):
         """
         Add the static IPv4 route `add_route` to the switch configuration.
         """
-        if type(add_route) is not route.IPv4Route:
-            raise Exception("Given route to add is not of type IPv4Route.")
-
         self.execute_command("config")
         route_output = self.execute_command("ip route {route.destination} {route.gateway}".format(route=add_route))
         self.execute_command("exit")
@@ -107,9 +104,6 @@ class Switch(object):
         """
         Remove the static route `remove_route` from the switch configuration.
         """
-        if type(remove_route) is not route.IPv4Route:
-            raise Exception("Given route to remove is not of type IPv4Route.")
-
         self.execute_command("config")
         route_output = self.execute_command(
                 "no ip route {route.destination} {route.gateway}".format(route=remove_route)
@@ -154,9 +148,6 @@ class Switch(object):
         """
         Add the static IPv6 route `add_route` to the switch configuration.
         """
-        if type(add_route) is not route.IPv6Route:
-            raise Exception("Given route to add is not of type IPv6Route.")
-
         self.execute_command("config")
         route_output = self.execute_command("ipv6 route {route.destination} {route.gateway}".format(route=add_route))
         self.execute_command("exit")
@@ -165,9 +156,6 @@ class Switch(object):
         """
         Remove the static IPv6 route `remove_route` from the switch configuration.
         """
-        if type(remove_route) is not route.IPv6Route:
-            raise Exception("Given route to remove is not of type IPv6Route.")
-
         self.execute_command("config")
         route_output = self.execute_command(
                 "no ipv6 route {route.destination} {route.gateway}".format(route=remove_route)
