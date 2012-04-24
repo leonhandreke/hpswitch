@@ -206,6 +206,22 @@ class VLAN(object):
 
     tagged_interfaces = property(_get_tagged_interfaces)
 
+    def add_tagged_interface(self, interface):
+        """
+        Configure this VLAN as tagged on the Interface `interface`.
+        """
+        self.switch.execute_command('config')
+        add_output = self.switch.execute_command('vlan {0} tagged {1}'.format(self.vid, interface.identifier))
+        self.switch.execute_command('exit')
+
+    def remove_tagged_interface(self, interface):
+        """
+        Remove this VLAN as tagged from the Interface `interface`.
+        """
+        self.switch.execute_command('config')
+        add_output = self.switch.execute_command('no vlan {0} tagged {1}'.format(self.vid, interface.identifier))
+        self.switch.execute_command('exit')
+
     def _get_untagged_interfaces(self):
         """
         Get a list of interface that have this VLAN configured as untagged.
@@ -219,3 +235,19 @@ class VLAN(object):
         return self._interface_list_from_interface_list_string(untagged_match.group('untagged_vlan_list_string'))
 
     untagged_interfaces = property(_get_untagged_interfaces)
+
+    def add_untagged_interface(self, interface):
+        """
+        Configure this VLAN as untagged on the Interface `interface`.
+        """
+        self.switch.execute_command('config')
+        add_output = self.switch.execute_command('vlan {0} untagged {1}'.format(self.vid, interface.identifier))
+        self.switch.execute_command('exit')
+
+    def remove_untagged_interface(self, interface):
+        """
+        Remove this VLAN as untagged from the Interface `interface`.
+        """
+        self.switch.execute_command('config')
+        add_output = self.switch.execute_command('no vlan {0} untagged {1}'.format(self.vid, interface.identifier))
+        self.switch.execute_command('exit')
