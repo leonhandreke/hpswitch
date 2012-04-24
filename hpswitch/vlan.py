@@ -14,6 +14,9 @@ class VLAN(object):
         self.vid = vid
         self.switch = switch
 
+    def __eq__(self, other):
+        return self.vid == other.vid and self.switch == other.switch
+
     def _get_running_config_output(self):
         """
         Get the output of the `show running-config vlan [vid]` command for this interface.
