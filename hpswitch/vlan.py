@@ -18,7 +18,10 @@ class VLAN(object):
         """
         Get the output of the `show running-config vlan [vid]` command for this interface.
         """
-        return self.switch.execute_command("show running-config vlan " + str(self.vid))
+        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
+        if "VLAN configuration is not available" in run_output:
+            raise Exception("VLAN {0} is not configured on the switch {1}.".format(self.vid, self.switch.hostname))
+        return run_output
 
     def _get_name(self):
         """
@@ -189,8 +192,6 @@ class VLAN(object):
                 raise Exception("Invalid interface range format encountered.")
 
         return interface_list
-
-
 
     def _get_tagged_interfaces(self):
         """
