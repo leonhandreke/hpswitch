@@ -1,6 +1,7 @@
 import re
 import ipaddress
 
+import interface
 
 class VLAN(object):
     """
@@ -13,11 +14,17 @@ class VLAN(object):
         self.vid = vid
         self.switch = switch
 
+    def _get_running_config_output(self):
+        """
+        Get the output of the `show running-config vlan [vid]` command for this interface.
+        """
+        return self.switch.execute_command("show running-config vlan " + str(self.vid))
+
     def _get_name(self):
         """
         The name configured for the VLAN.
         """
-        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
+        run_output = self._get_running_config_output()
         # Try to extract the VLAN name, which may also contain spaces. This is achieved by greedily matching whitespace
         # at the end of the line and matching the `   name ` prefix a the beginning and using whatever remains of the
         # string as the VLAN name. The `name` group is matched in a non-greedy fashion as to not "eat up" all the
@@ -41,7 +48,7 @@ class VLAN(object):
         """
         Get the IPv4 addresses configured configured for this VLAN.
         """
-        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
+        run_output = self._get_running_config_output()
         ipv4_address_matches = re.finditer(
                 r"^   ip address " \
                         # Match the IPv4 address consisting of 4 groups of up to 3 digits
@@ -100,7 +107,7 @@ class VLAN(object):
         """
         Get the IPv6 addresses configured for this VLAN.
         """
-        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
+        run_output = self._get_running_config_output()
         ipv6_address_matches = re.finditer(
                 r"^   ipv6 address " \
                         # Match the IPv6 address containing hex-digits, : and / to separate the netmask
@@ -145,3 +152,70 @@ class VLAN(object):
         if remove_output == "The IP address {0} is not configured on this VLAN.".format(address.with_prefixlen):
             raise Exception("The IPv6 address {0} could not be removed because it is not configured for this " \
             "VLAN.".format(address.with_prefixlen))
+
+
+    def _interface_list_from_interface_list_string(self, interface_list_string):
+        """
+        Given a complicated interface list string output by the `show running-config` command, return a list of
+        Interface objects described by this string.
+        """
+        interface_list = []
+
+        # Ranges are seperated by commas, so split them up first.
+        interface_range_strings = interface_list_string.split(',')
+        # Resolve each interface range individually.
+        for interface_range_string in interface_range_strings:
+            # If this string is a range, the first and the last interface in the range are seperated by a hyphen. If the
+            # item is only a single interface, splitting will do nothing.
+            interface_range_components = interface_range_string.split('-')
+            # Check if the current string describes only a single interface.
+            if len(interface_range_components) is 1:
+                # Create and remember the single interface that was found in the list to return.
+                interface_list.append(interface.Interface(self.switch, interface_range_components[0]))
+            # Check if the current string describes a range of interfaces.
+            elif len(interface_range_components) is 2:
+                # Interface ranges always have a common prefix consisting only of letters. Find out what this component
+                # is.
+                interface_alpha_component = re.split('([a-zA-Z]+)', interface_range_components[0])[1]
+                # Strip off this non-numeric alpha component from the range components to receive numeric ranges.
+                interface_range_start = int(interface_range_components[0][len(interface_alpha_component):])
+                interface_range_end = int(interface_range_components[1][len(interface_alpha_component):])
+                # For each of the numbers in the range, prepend the alpha component to construct the final interface
+                # identifier string.
+                for i in range(interface_range_start, interface_range_end + 1):
+                    # Add the found interface to the list of interfaces to return.
+                    interface_list.append(interface.Interface(self.switch, interface_alpha_component + str(i)))
+            else:
+                raise Exception("Invalid interface range format encountered.")
+
+        return interface_list
+
+
+
+    def _get_tagged_interfaces(self):
+        """
+        Get a list of interface that have this VLAN configured as tagged.
+        """
+        run_output = self._get_running_config_output()
+        tagged_match = re.search(r"^   tagged (?P<tagged_vlan_list_string>.*?)\s*$", run_output, re.MULTILINE)
+        # If no interfaces have this VLAN configured as tagged, return an empty list.
+        if not tagged_match:
+            return []
+
+        return self._interface_list_from_interface_list_string(tagged_match.group('tagged_vlan_list_string'))
+
+    tagged_interfaces = property(_get_tagged_interfaces)
+
+    def _get_untagged_interfaces(self):
+        """
+        Get a list of interface that have this VLAN configured as untagged.
+        """
+        run_output = self._get_running_config_output()
+        untagged_match = re.search(r"^   untagged (?P<untagged_vlan_list_string>.*?)\s*$", run_output, re.MULTILINE)
+        # If no interfaces have this VLAN configured as untagged, return an empty list.
+        if not untagged_match:
+            return []
+
+        return self._interface_list_from_interface_list_string(untagged_match.group('untagged_vlan_list_string'))
+
+    untagged_interfaces = property(_get_untagged_interfaces)
