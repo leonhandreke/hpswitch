@@ -1,4 +1,7 @@
-import re
+# -*- coding: utf-8 -*-
+import struct
+
+from pysnmp.proto import rfc1902
 import ipaddress
 
 import interface
@@ -14,39 +17,27 @@ class VLAN(object):
         self.vid = vid
         self.switch = switch
 
+
+    def _get_ifindex(self):
+        # TODO: is this correct?
+        return self.vid + 577
+
+    ifindex = property(_get_ifindex)
+
     def __eq__(self, other):
         return self.vid == other.vid and self.switch == other.switch
-
-    def _get_running_config_output(self):
-        """
-        Get the output of the `show running-config vlan [vid]` command for this interface.
-        """
-        run_output = self.switch.execute_command("show running-config vlan " + str(self.vid))
-        if "VLAN configuration is not available" in run_output:
-            raise Exception("VLAN {0} is not configured on the switch {1}.".format(self.vid, self.switch.hostname))
-        return run_output
 
     def _get_name(self):
         """
         The name configured for the VLAN.
         """
-        run_output = self._get_running_config_output()
-        # Try to extract the VLAN name, which may also contain spaces. This is achieved by greedily matching whitespace
-        # at the end of the line and matching the `   name ` prefix a the beginning and using whatever remains of the
-        # string as the VLAN name. The `name` group is matched in a non-greedy fashion as to not "eat up" all the
-        # following whitespace which is not part of the name.
-        name_match = re.search(r"^   name \"(?P<name>.*?)\"\s*$", run_output, re.MULTILINE)
-        return name_match.group('name')
+        return unicode(self.switch.snmp_get(("dot1qVlanStaticName", self.vid)))
 
     def _set_name(self, value):
         # Make sure that the name is legal according to the allowed VLAN names detailed in section 1-40 of the HP
         # Advanced Traffic Management Guide
         assert(all(map(lambda illegal_char: illegal_char not in value, "\"\'@#$^&*")))
-        # Issue the commands on the switch to set the new name.
-        self.switch.execute_command("config")
-        # Pass the name to the switch wrapped in quotes because the name could contain spaces.
-        self.switch.execute_command("vlan {0} name \"{1}\"".format(self.vid, value))
-        self.switch.execute_command("exit")
+        self.switch.snmp_set((("dot1qVlanStaticName", self.vid), rfc1902.OctetString(value)))
 
     name = property(_get_name, _set_name)
 
@@ -54,22 +45,24 @@ class VLAN(object):
         """
         Get the IPv4 addresses configured configured for this VLAN.
         """
-        run_output = self._get_running_config_output()
-        ipv4_address_matches = re.finditer(
-                r"^   ip address " \
-                        # Match the IPv4 address consisting of 4 groups of up to 3 digits
-                        "(?P<address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
-                        " " \
-                        # Match the IPv4 netmask consisting of 4 groups of up to 3 digits
-                        "(?P<netmask>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
-                        "\s*$",
-                run_output, re.MULTILINE)
+        # Get all address Entries in hpicfIpAddressTable
+        hpicfIpAddressEntries = self.switch.snmp_get_subtree(("hpicfIpAddressEntry", ))
+        vlan_ipv4_address_prefix_length_entries = filter(
+                # oid[17] contains the ifindex
+                lambda result: result[0][17] == self.ifindex
+                # oid[18] is 1 for IPv4 addresses
+                and result[0][18] == 1
+                # hpicfIpAddressPrefixLength is oid[16] == 3
+                and result[0][16] == 3,
+                hpicfIpAddressEntries)
 
-        addresses = []
-        for match in ipv4_address_matches:
-            addresses.append(ipaddress.IPv4Interface(match.group('address') + '/' + match.group('netmask')))
-
-        return addresses
+        ipv4_addresses = []
+        for result in vlan_ipv4_address_prefix_length_entries:
+            # Build an IPv4 address from the last 4 components of the oid
+            ipv4_address_string = reduce(lambda a, b: a + "." + b, map(unicode, tuple(result[0][-4:])))
+            ipv4_prefix_length_string = unicode(result[1])
+            ipv4_addresses.append(ipaddress.IPv4Interface(ipv4_address_string + "/" + ipv4_prefix_length_string))
+        return ipv4_addresses
 
     ipv4_addresses = property(_get_ipv4_addresses)
 
@@ -79,20 +72,18 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('vlan {0} ip address {1}'.format(self.vid, address.with_prefixlen))
-        self.switch.execute_command('exit')
-
-        # HP switches seem to be somewhat picky about the IPv4 addresses they like. For example, running `vlan 1001 ip
-        # address 192.168.1.1/32` results in the output `192.168.1.1/32: bad IP address.`.  Therefore, we try to catch
-        # the worst things that could happen here.
-        if "bad IP address" in add_output:
-            raise Exception("IPv4 address {0} deemed \"bad\" by switch.".format(address.with_prefixlen))
-
-        # Check if configuring the address failed because the address was already configured on this switch.
-        if add_output == "The IP address (or subnet) {0} already exists.".format(address.with_prefixlen):
-            raise Exception("The IPv4 address {0} could not be configured because it was already configured for " \
-                    "this VLAN.".format(address.with_prefixlen))
+        ipv4_address_tuple = struct.unpack("4B", address.packed)
+        self.switch.snmp_set(
+                (("ipv4InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
+                # hpicfIpv4InterfaceDhcpEnable off
+                (("hpicfIpv4InterfaceDhcpEnable", self.ifindex), rfc1902.Integer(2)),
+                (("hpicfIpAddressPrefixLength", self.ifindex, 1, 4) + ipv4_address_tuple,
+                    rfc1902.Gauge32(address.prefixlen)),
+                # hpicfIpAddressType IPv4
+                (("hpicfIpAddressType", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(1)),
+                # hpicfIpAddressRowStatus createAndGo 4
+                (("hpicfIpAddressRowStatus", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(4))
+                )
 
     def remove_ipv4_address(self, address):
         """
@@ -100,32 +91,46 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        self.switch.execute_command('config')
-        remove_output = self.switch.execute_command('no vlan {0} ip address {1}'.format(self.vid, address.with_prefixlen))
-        self.switch.execute_command('exit')
-
-        # Check if the address successfully removed or if it wasn't even configured.
-        if remove_output == "The IP address {0} is not configured on this VLAN.".format(address.with_prefixlen):
-            raise Exception("The IPv4 address {0} could not be removed because it is not configured for this " \
-            "VLAN.".format(address.with_prefixlen))
+        ipv4_address_tuple = struct.unpack("4B", address.packed)
+        self.switch.snmp_set(
+                # hpicfIpAddressRowStatus destroy 6
+                (("hpicfIpAddressRowStatus", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(6))
+                )
 
     def _get_ipv6_addresses(self):
         """
         Get the IPv6 addresses configured for this VLAN.
         """
-        run_output = self._get_running_config_output()
-        ipv6_address_matches = re.finditer(
-                r"^   ipv6 address " \
-                        # Match the IPv6 address containing hex-digits, : and / to separate the netmask
-                        "(?P<address>[0-9abcdefABCDEF:/]+)" \
-                        "\s*$",
-                run_output, re.MULTILINE)
+        # Get all address Entries in hpicfIpAddressTable
+        hpicfIpAddressEntries = self.switch.snmp_get_subtree(("hpicfIpAddressEntry", ))
+        vlan_ipv6_address_prefix_length_entries = filter(
+                # oid[17] contains the ifindex
+                lambda result: result[0][17] == self.ifindex
+                # oid[18] is 2 for IPv6 addresses
+                and result[0][18] == 2
+                # hpicfIpAddressPrefixLength is oid[16] == 3
+                and result[0][16] == 3,
+                hpicfIpAddressEntries)
 
-        addresses = []
-        for match in ipv6_address_matches:
-            addresses.append(ipaddress.IPv6Interface(match.group('address')))
+        ipv6_addresses = []
+        for result in vlan_ipv6_address_prefix_length_entries:
+            # Build an IPv6 address from the last 16 components of the oid
+            ipv6_address_string_without_colons = reduce(
+                    lambda a, b: a + b, 
+                    map(lambda x: unicode("%02x" % x), tuple(result[0][-16:]))
+                    )
+            ipv6_address_string = ""
+            while True:
+                ipv6_address_string += ipv6_address_string_without_colons[:4]
+                ipv6_address_string_without_colons = ipv6_address_string_without_colons[4:]
+                if len(ipv6_address_string_without_colons) != 0:
+                    ipv6_address_string += ":"
+                else:
+                    break
 
-        return addresses
+            ipv6_prefix_length_string = unicode(result[1])
+            ipv6_addresses.append(ipaddress.IPv6Interface(ipv6_address_string + "/" + ipv6_prefix_length_string))
+        return ipv6_addresses
 
     ipv6_addresses = property(_get_ipv6_addresses)
 
@@ -135,14 +140,17 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('vlan {0} ipv6 address {1}'.format(self.vid, address.with_prefixlen))
-        self.switch.execute_command('exit')
-
-        # Check if configuring the address failed because the address this VLAN was already configured on the switch.
-        if add_output == "The IP address (or subnet) {0} already exists.".format(address.with_prefixlen):
-            raise Exception("The IPv6 address {0} could not be configured because it was already configured for " \
-                    "this VLAN.".format(address.with_prefixlen))
+        ipv6_address_tuple = struct.unpack("16B", address.packed)
+        self.switch.snmp_set(
+                (("ipv6InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
+                #(("hpicfIpv4InterfaceDhcpEnable", self.ifindex), rfc1902.Integer(2)),
+                (("hpicfIpAddressPrefixLength", self.ifindex, 2, 16) + ipv6_address_tuple,
+                    rfc1902.Gauge32(address.prefixlen)),
+                # hpicfIpAddressType IPv6
+                (("hpicfIpAddressType", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(1)),
+                # hpicfIpAddressRowStatus createAndGo 4
+                (("hpicfIpAddressRowStatus", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(4))
+                )
 
     def remove_ipv6_address(self, address):
         """
@@ -150,63 +158,18 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        self.switch.execute_command('config')
-        remove_output = self.switch.execute_command('no vlan {0} ipv6 address {1}'.format(self.vid, address.with_prefixlen))
-        self.switch.execute_command('exit')
+        ipv6_address_tuple = struct.unpack("16B", address.packed)
+        self.switch.snmp_set(
+                # hpicfIpAddressRowStatus destroy 6
+                (("hpicfIpAddressRowStatus", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(6))
+                )
 
-        # Check if the address on this VLAN was successfully removed or if it wasn't even configured on this switch.
-        if remove_output == "The IP address {0} is not configured on this VLAN.".format(address.with_prefixlen):
-            raise Exception("The IPv6 address {0} could not be removed because it is not configured for this " \
-            "VLAN.".format(address.with_prefixlen))
-
-
-    def _interface_list_from_interface_list_string(self, interface_list_string):
-        """
-        Given a complicated interface list string output by the `show running-config` command, return a list of
-        Interface objects described by this string.
-        """
-        interface_list = []
-
-        # Ranges are seperated by commas, so split them up first.
-        interface_range_strings = interface_list_string.split(',')
-        # Resolve each interface range individually.
-        for interface_range_string in interface_range_strings:
-            # If this string is a range, the first and the last interface in the range are seperated by a hyphen. If the
-            # item is only a single interface, splitting will do nothing.
-            interface_range_components = interface_range_string.split('-')
-            # Check if the current string describes only a single interface.
-            if len(interface_range_components) is 1:
-                # Create and remember the single interface that was found in the list to return.
-                interface_list.append(interface.Interface(self.switch, interface_range_components[0]))
-            # Check if the current string describes a range of interfaces.
-            elif len(interface_range_components) is 2:
-                # Interface ranges always have a common prefix consisting only of letters. Find out what this component
-                # is.
-                interface_alpha_component = re.split('([a-zA-Z]+)', interface_range_components[0])[1]
-                # Strip off this non-numeric alpha component from the range components to receive numeric ranges.
-                interface_range_start = int(interface_range_components[0][len(interface_alpha_component):])
-                interface_range_end = int(interface_range_components[1][len(interface_alpha_component):])
-                # For each of the numbers in the range, prepend the alpha component to construct the final interface
-                # identifier string.
-                for i in range(interface_range_start, interface_range_end + 1):
-                    # Add the found interface to the list of interfaces to return.
-                    interface_list.append(interface.Interface(self.switch, interface_alpha_component + str(i)))
-            else:
-                raise Exception("Invalid interface range format encountered.")
-
-        return interface_list
 
     def _get_tagged_interfaces(self):
         """
         Get a list of interface that have this VLAN configured as tagged.
         """
-        run_output = self._get_running_config_output()
-        tagged_match = re.search(r"^   tagged (?P<tagged_vlan_list_string>.*?)\s*$", run_output, re.MULTILINE)
-        # If no interfaces have this VLAN configured as tagged, return an empty list.
-        if not tagged_match:
-            return []
-
-        return self._interface_list_from_interface_list_string(tagged_match.group('tagged_vlan_list_string'))
+        pass
 
     tagged_interfaces = property(_get_tagged_interfaces)
 
@@ -214,29 +177,19 @@ class VLAN(object):
         """
         Configure this VLAN as tagged on the Interface `interface`.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('vlan {0} tagged {1}'.format(self.vid, interface.identifier))
-        self.switch.execute_command('exit')
+        pass
 
     def remove_tagged_interface(self, interface):
         """
         Remove this VLAN as tagged from the Interface `interface`.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('no vlan {0} tagged {1}'.format(self.vid, interface.identifier))
-        self.switch.execute_command('exit')
+        pass
 
     def _get_untagged_interfaces(self):
         """
         Get a list of interface that have this VLAN configured as untagged.
         """
-        run_output = self._get_running_config_output()
-        untagged_match = re.search(r"^   untagged (?P<untagged_vlan_list_string>.*?)\s*$", run_output, re.MULTILINE)
-        # If no interfaces have this VLAN configured as untagged, return an empty list.
-        if not untagged_match:
-            return []
-
-        return self._interface_list_from_interface_list_string(untagged_match.group('untagged_vlan_list_string'))
+        pass
 
     untagged_interfaces = property(_get_untagged_interfaces)
 
@@ -244,14 +197,10 @@ class VLAN(object):
         """
         Configure this VLAN as untagged on the Interface `interface`.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('vlan {0} untagged {1}'.format(self.vid, interface.identifier))
-        self.switch.execute_command('exit')
+        pass
 
     def remove_untagged_interface(self, interface):
         """
         Remove this VLAN as untagged from the Interface `interface`.
         """
-        self.switch.execute_command('config')
-        add_output = self.switch.execute_command('no vlan {0} untagged {1}'.format(self.vid, interface.identifier))
-        self.switch.execute_command('exit')
+        pass

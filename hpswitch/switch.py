@@ -1,61 +1,73 @@
-import ipaddress
-import paramiko
-import re
+# -*- coding: utf-8 -*-
 
-import route
+import string
+import sys
+
+from pysnmp.entity.rfc3413.oneliner import cmdgen
+from pysnmp.smi import builder, view
+
+import ipaddress
 
 class Switch(object):
     """
     Represents a generic HP Networking switch.
     """
-    def __init__(self, hostname):
+    def __init__(self, hostname, community="public"):
         self.hostname = hostname
+        self.community = community
 
-        # Establish a new SSH connection to the switch.
+        mib_builder = builder.MibBuilder()
+        mib_builder.setMibPath(*(mib_builder.getMibPath() + (sys.path[0],)))
+        mib_builder.loadModules('RFC1213-MIB', 'BRIDGE-MIB', 'IF-MIB', 'Q-BRIDGE-MIB', 'IP-MIB', 'HP-ICF-IPCONFIG')
 
-        # TODO: what happens if the connection drops?
-        self._ssh_connection = paramiko.SSHClient()
-        self._ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self._ssh_connection.connect(self.hostname)
-        # Request a new pseudo-terminal and immediately resize it to something huge. Else, the switch will try to make
-        # the output scrollable with a keyboard, which is somewhat hard to emulate in code.
-        self._ssh_pty = self._ssh_connection.invoke_shell()
-        self._ssh_pty.resize_pty(width = 1000000, height=1000000)
-        # Receive the annoying HP welcome message and skip it immediately.
-        self._ssh_pty.recv(9000)
-        self._ssh_pty.send('\n')
-        self._ssh_pty.recv(9000)
+        self.mib_view_controller = view.MibViewController(mib_builder)
 
-    def execute_command(self, command, timeout=5):
+        self.command_generator = cmdgen.CommandGenerator()
+        self.command_generator.mibViewController = view.MibViewController(mib_builder)
+
+    def _get_oid_for_managed_object_name(self, name):
         """
-        Execute a command on the switch using the SSH protocol.
-
-        The `timeout` given in seconds dictates how long this method should wait for the switch to send the command
-        output before raising a `socket.timeout` exception.
-
-        Returns the output of the command.
+        Translade a MIB object name to an OID
         """
-        # Set the timout for the SSH channel to return the command output and run the desired command.
-        self._ssh_pty.settimeout(timeout)
-        self._ssh_pty.send(command + '\n')
+        oid, label, suffix = self.mib_view_controller.getNodeName(name)
+        return oid + suffix
 
-        recv_buffer = ''
-        while True:
-            # Receive lots of bytes so that in most cases, another `recv()` call is not required.
-            recv_buffer += self._ssh_pty.recv(1000000)
-            # Clean up the vt100 control sequences that the switch inserts. The regular expression is stolen from a
-            # thread on [python-list](http://mail.python.org/pipermail/python-list/2009-September/1219674.html).
-            recv_buffer = re.sub("\x1B[^A-Za-z]*?[A-Za-z]", '', recv_buffer)
-            # Check if the received string ends with a `# ` shell-prompt. If so, it's pretty safe to assume that the
-            # command has finished executing and all desired output has been received.
-            if recv_buffer.endswith('# '):
-                break
+    def _get_interface_location_for_ifindex(self, ifindex):
+        return ((ifindex - 1)/52 + 1, (ifindex - 1) % 52 + 1)
 
-        # Strip off the command entered command at the beginning and the last line containing the shell prompt
-        recv_buffer = re.sub(r"^" + command, "", recv_buffer)
-        recv_buffer = re.sub(r"\r\n.*?# $", "", recv_buffer)
+    def _get_ifindex_for_interface_location(self, interface_location):
+        unit, port = interface_location
+        return (unit - 1)*24 + port
 
-        return recv_buffer
+    def _get_ifindex_for_interface_identifier(self, interface_identifier):
+        unit = string.ascii_uppercase.index(interface_identifier[0].upper()) + 1
+        port = int(interface_identifier[1:])
+        return self._get_ifindex_for_interface_location((unit, port))
+
+    def snmp_get(self, oid):
+        errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.getCmd(
+                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
+                self._get_oid_for_managed_object_name(oid)
+                )
+        return varBinds[0][1]
+
+    def snmp_set(self, *var_binds):
+        errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.setCmd(
+                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
+                *[(self._get_oid_for_managed_object_name(oid), value) for (oid, value) in var_binds]
+                )
+        return varBinds[0][1]
+
+    def snmp_get_subtree(self, oid):
+        errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.nextCmd(
+                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
+                self._get_oid_for_managed_object_name(oid)
+                )
+        return [tuple(x[0]) for x in varBinds]
+
 
     # == Static route management ==
 
@@ -65,30 +77,7 @@ class Switch(object):
         """
         Get all static IPv4 routes configured on this switch.
         """
-        run_output = self.execute_command("show running-config")
-        ipv4_route_matches = re.finditer(
-                r"^ip route " \
-                        # Match the IPv4 address consisting of 4 groups of up to 3 digits
-                        "(?P<destination_address>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
-                        " " \
-                        # Match the IPv4 netmask consisting of 4 groups of up to 3 digits
-                        "(?P<destination_netmask>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
-                        " " \
-                        # Match the gateway address consisting of 4 groups of up to 3 digits
-                        "(?P<gateway>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))" \
-                        "\s*$",
-                run_output, re.MULTILINE)
-
-        routes = []
-        for match in ipv4_route_matches:
-            routes.append(
-                    route.IPv4Route(
-                        ipaddress.IPv4Network(match.group('destination_address') + '/' + match.group('destination_netmask')),
-                        ipaddress.IPv4Address(match.group('gateway'))
-                        )
-                    )
-
-        return routes
+        pass
 
     static_ipv4_routes = property(_get_static_ipv4_routes)
 
@@ -96,23 +85,13 @@ class Switch(object):
         """
         Add the static IPv4 route `add_route` to the switch configuration.
         """
-        self.execute_command("config")
-        route_output = self.execute_command("ip route {route.destination} {route.gateway}".format(route=add_route))
-        self.execute_command("exit")
+        pass
 
     def remove_static_ipv4_route(self, remove_route):
         """
         Remove the static route `remove_route` from the switch configuration.
         """
-        self.execute_command("config")
-        route_output = self.execute_command(
-                "no ip route {route.destination} {route.gateway}".format(route=remove_route)
-                )
-        self.execute_command("exit")
-
-        if route_output == "The route not found or not configurable.":
-            raise Exception("The route {route} could not be removed because it is not configured on this " \
-                    "switch.".format(route=remove_route))
+        pass
 
     # === IPv6 static route management ===
 
@@ -120,27 +99,7 @@ class Switch(object):
         """
         Get all static IPv6 routes configured on this switch.
         """
-        run_output = self.execute_command("show running-config")
-        ipv6_route_matches = re.finditer(
-                r"^ipv6 route " \
-                        # Match the IPv6 address containing hex-digits, : and / to separate the netmask
-                        "(?P<destination>[0-9abcdefABCDEF:/]+)" \
-                        " " \
-                        # Match the IPv6 address of the gateway, which should not contain a /
-                        "(?P<gateway>[0-9abcdefABCDEF:]+)" \
-                        "\s*$",
-                run_output, re.MULTILINE)
-
-        routes = []
-        for match in ipv6_route_matches:
-            routes.append(
-                    route.IPv6Route(
-                        ipaddress.IPv6Network(match.group('destination')),
-                        ipaddress.IPv6Address(match.group('gateway'))
-                        )
-                    )
-
-        return routes
+        pass
 
     static_ipv6_routes = property(_get_static_ipv6_routes)
 
@@ -148,20 +107,10 @@ class Switch(object):
         """
         Add the static IPv6 route `add_route` to the switch configuration.
         """
-        self.execute_command("config")
-        route_output = self.execute_command("ipv6 route {route.destination} {route.gateway}".format(route=add_route))
-        self.execute_command("exit")
+        pass
 
     def remove_static_ipv6_route(self, remove_route):
         """
         Remove the static IPv6 route `remove_route` from the switch configuration.
         """
-        self.execute_command("config")
-        route_output = self.execute_command(
-                "no ipv6 route {route.destination} {route.gateway}".format(route=remove_route)
-                )
-        self.execute_command("exit")
-
-        if route_output == "The route not found or not configurable.":
-            raise Exception("The route {route} could not be removed because it is not configured on this " \
-                    "switch.".format(route=remove_route))
+        pass
