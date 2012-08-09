@@ -32,17 +32,17 @@ class Switch(object):
         oid, label, suffix = self.mib_view_controller.getNodeName(name)
         return oid + suffix
 
-    def _get_interface_location_for_ifindex(self, ifindex):
+    def _get_port_location_for_ifindex(self, ifindex):
         return ((ifindex - 1)/52 + 1, (ifindex - 1) % 52 + 1)
 
-    def _get_ifindex_for_interface_location(self, interface_location):
-        unit, port = interface_location
+    def _get_ifindex_for_port_location(self, port_location):
+        unit, port = port_location
         return (unit - 1)*24 + port
 
-    def _get_ifindex_for_interface_identifier(self, interface_identifier):
-        unit = string.ascii_uppercase.index(interface_identifier[0].upper()) + 1
-        port = int(interface_identifier[1:])
-        return self._get_ifindex_for_interface_location((unit, port))
+    def _get_ifindex_for_port_identifier(self, port_identifier):
+        unit = string.ascii_uppercase.index(port_identifier[0].upper()) + 1
+        port = int(port_identifier[1:])
+        return self._get_ifindex_for_port_location((unit, port))
 
     def snmp_get(self, oid):
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.getCmd(

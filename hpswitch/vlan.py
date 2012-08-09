@@ -4,7 +4,7 @@ import struct
 from pysnmp.proto import rfc1902
 import ipaddress
 
-import interface
+import port
 
 class VLAN(object):
     """
@@ -165,42 +165,42 @@ class VLAN(object):
                 )
 
 
-    def _get_tagged_interfaces(self):
+    def _get_tagged_ports(self):
         """
-        Get a list of interface that have this VLAN configured as tagged.
-        """
-        pass
-
-    tagged_interfaces = property(_get_tagged_interfaces)
-
-    def add_tagged_interface(self, interface):
-        """
-        Configure this VLAN as tagged on the Interface `interface`.
+        Get a list of ports that have this VLAN configured as tagged.
         """
         pass
 
-    def remove_tagged_interface(self, interface):
+    tagged_ports = property(_get_tagged_ports)
+
+    def add_tagged_port(self, port):
         """
-        Remove this VLAN as tagged from the Interface `interface`.
+        Configure this VLAN as tagged on the Port `port`.
         """
         pass
 
-    def _get_untagged_interfaces(self):
+    def remove_tagged_port(self, port):
         """
-        Get a list of interface that have this VLAN configured as untagged.
-        """
-        pass
-
-    untagged_interfaces = property(_get_untagged_interfaces)
-
-    def add_untagged_interface(self, interface):
-        """
-        Configure this VLAN as untagged on the Interface `interface`.
+        Remove this VLAN as tagged from the Port `port`.
         """
         pass
 
-    def remove_untagged_interface(self, interface):
+    def _get_untagged_ports(self):
         """
-        Remove this VLAN as untagged from the Interface `interface`.
+        Get a list of ports that have this VLAN configured as untagged.
+        """
+        pass
+
+    untagged_ports = property(_get_untagged_ports)
+
+    def add_untagged_port(self, port):
+        """
+        Configure this VLAN as untagged on the Port `port`.
+        """
+        pass
+
+    def remove_untagged_port(self, port):
+        """
+        Remove this VLAN as untagged from the Port `port`.
         """
         pass
