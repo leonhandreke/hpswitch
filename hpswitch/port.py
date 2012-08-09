@@ -14,6 +14,7 @@ class Port(object):
         self.identifier = identifier
 
     ifindex = property(lambda self: self.switch._get_ifindex_for_port_identifier(self.identifier))
+    base_port = property(lambda self: self.switch._get_base_port_for_port_identifier(self.identifier))
 
     def _get_name(self):
         """

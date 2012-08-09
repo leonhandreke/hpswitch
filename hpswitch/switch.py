@@ -44,6 +44,9 @@ class Switch(object):
         port = int(port_identifier[1:])
         return self._get_ifindex_for_port_location((unit, port))
 
+    _get_base_port_for_port_identifier = _get_ifindex_for_port_identifier
+    _get_base_port_for_port_location = _get_ifindex_for_port_location
+
     def snmp_get(self, oid):
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.getCmd(
                 cmdgen.CommunityData('my-agent', self.community, 1),
