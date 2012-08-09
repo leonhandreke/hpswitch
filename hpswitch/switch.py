@@ -27,45 +27,44 @@ class Switch(object):
 
     def _get_oid_for_managed_object_name(self, name):
         """
-        Translade a MIB object name to an OID
+        Translate a MIB object name to an OID
         """
         oid, label, suffix = self.mib_view_controller.getNodeName(name)
         return oid + suffix
 
-    def _get_port_location_for_ifindex(self, ifindex):
-        return ((ifindex - 1)/52 + 1, (ifindex - 1) % 52 + 1)
-
-    def _get_ifindex_for_port_location(self, port_location):
-        unit, port = port_location
-        return (unit - 1)*24 + port
-
-    def _get_ifindex_for_port_identifier(self, port_identifier):
-        unit = string.ascii_uppercase.index(port_identifier[0].upper()) + 1
-        port = int(port_identifier[1:])
-        return self._get_ifindex_for_port_location((unit, port))
-
-    _get_base_port_for_port_identifier = _get_ifindex_for_port_identifier
-    _get_base_port_for_port_location = _get_ifindex_for_port_location
-
     def snmp_get(self, oid):
+        """
+        Perform an SNMP GET request on the switch.
+
+        Returns the value returned by the switch.
+        """
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.getCmd(
-                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.CommunityData('hpswitch', self.community, 1),
                 cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
                 self._get_oid_for_managed_object_name(oid)
                 )
         return varBinds[0][1]
 
     def snmp_set(self, *var_binds):
+        """
+        Perform an SNMP SET request on the switch.
+
+        Takes an arbitrary number of (oid, value) pairs as arguments.
+        """
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.setCmd(
-                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.CommunityData('hpswitch', self.community, 1),
                 cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
                 *[(self._get_oid_for_managed_object_name(oid), value) for (oid, value) in var_binds]
                 )
-        return varBinds[0][1]
 
     def snmp_get_subtree(self, oid):
+        """
+        Recursively get all objects that have `oid` as a parent using SNMP GETNEXT.
+
+        Returns a list of (oid, value) pairs.
+        """
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.nextCmd(
-                cmdgen.CommunityData('my-agent', self.community, 1),
+                cmdgen.CommunityData('hpswitch', self.community, 1),
                 cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
                 self._get_oid_for_managed_object_name(oid)
                 )

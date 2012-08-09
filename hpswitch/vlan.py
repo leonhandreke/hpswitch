@@ -165,42 +165,77 @@ class VLAN(object):
                 )
 
 
+    @staticmethod
+    def _get_port_list_port_value(port_list, port):
+        byte_position = (port.base_port - 1) / 8
+        bit_position = 7 - ((port.base_port - 1) % 8)
+        return (ord(port_list[byte_position]) & (1 << bit_position)) != 0
+
+    @staticmethod
+    def _set_port_list_port_status(port_list, port, status):
+        """
+        Return a new port list that is identical to the given `port_list` except that the bit corresponding to `port` is
+        set to the binary value of `status`.
+        """
+        # Calculate the byte in `port_list` that needs to be modified as well as the bit within that byte.
+        byte_position = (port.base_port - 1) / 8
+        bit_position = 7 - ((port.base_port - 1) % 8)
+
+        if status:
+            newbyte = chr(ord(port_list[byte_position]) | (1 << bit_position))
+        else:
+            newbyte = chr(ord(post_list[byte_position]) & (~(1 << bit_position)))
+
+        new_port_list = port_list[:byte_position] + newbyte + port_list[(byte_position + 1):]
+        return new_port_list
+
     def _get_tagged_ports(self):
         """
         Get a list of ports that have this VLAN configured as tagged.
         """
-        pass
+        raise NotImplementedError
 
     tagged_ports = property(_get_tagged_ports)
+
+    def _set_port_tagged_status(self, port, status):
+        dot1qVlanStaticEgressPorts = self.switch.snmp_get(("dot1qVlanStaticEgressPorts", self.vid))
+        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticEgressPorts[1], port, status)
+        self.switch.snmp_set((("dot1qVlanStaticEgressPorts", self.vid), rfc1902.OctetString(new_port_list)))
 
     def add_tagged_port(self, port):
         """
         Configure this VLAN as tagged on the Port `port`.
         """
-        pass
+        self._set_port_tagged_status(port, True)
 
     def remove_tagged_port(self, port):
         """
         Remove this VLAN as tagged from the Port `port`.
         """
-        pass
+        self._set_port_tagged_status(port, False)
 
     def _get_untagged_ports(self):
         """
         Get a list of ports that have this VLAN configured as untagged.
         """
-        pass
+        raise NotImplementedError
 
     untagged_ports = property(_get_untagged_ports)
+
+    def _set_port_untagged_status(self, port, status):
+        dot1qVlanStaticUntaggedPorts = self.switch.snmp_get(("dot1qVlanStaticUntaggedPorts", self.vid))
+        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticUntaggedPorts[1], port, status)
+        self.switch.snmp_set((("dot1qVlanStaticUntaggedPorts", self.vid), rfc1902.OctetString(new_port_list)))
+        self.switch.snmp_set((("dot1qPvid", port.base_port), rfc1902.Gauge32(self.vid)))
 
     def add_untagged_port(self, port):
         """
         Configure this VLAN as untagged on the Port `port`.
         """
-        pass
+        self._set_port_untagged_status(port, True)
 
     def remove_untagged_port(self, port):
         """
         Remove this VLAN as untagged from the Port `port`.
         """
-        pass
+        self._set_port_untagged_status(port, False)
