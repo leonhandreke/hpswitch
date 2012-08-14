@@ -184,7 +184,7 @@ class VLAN(object):
         if status:
             newbyte = chr(ord(port_list[byte_position]) | (1 << bit_position))
         else:
-            newbyte = chr(ord(post_list[byte_position]) & (~(1 << bit_position)))
+            newbyte = chr(ord(port_list[byte_position]) & (~(1 << bit_position)))
 
         new_port_list = port_list[:byte_position] + newbyte + port_list[(byte_position + 1):]
         return new_port_list
@@ -199,7 +199,7 @@ class VLAN(object):
 
     def _set_port_tagged_status(self, port, status):
         dot1qVlanStaticEgressPorts = self.switch.snmp_get(("dot1qVlanStaticEgressPorts", self.vid))
-        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticEgressPorts[1], port, status)
+        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticEgressPorts, port, status)
         self.switch.snmp_set((("dot1qVlanStaticEgressPorts", self.vid), rfc1902.OctetString(new_port_list)))
 
     def add_tagged_port(self, port):
@@ -224,7 +224,7 @@ class VLAN(object):
 
     def _set_port_untagged_status(self, port, status):
         dot1qVlanStaticUntaggedPorts = self.switch.snmp_get(("dot1qVlanStaticUntaggedPorts", self.vid))
-        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticUntaggedPorts[1], port, status)
+        new_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticUntaggedPorts, port, status)
         self.switch.snmp_set((("dot1qVlanStaticUntaggedPorts", self.vid), rfc1902.OctetString(new_port_list)))
         self.switch.snmp_set((("dot1qPvid", port.base_port), rfc1902.Gauge32(self.vid)))
 

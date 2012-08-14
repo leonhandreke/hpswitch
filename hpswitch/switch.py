@@ -45,7 +45,7 @@ class Switch(object):
                 )
         return varBinds[0][1]
 
-    def snmp_set(self, *var_binds):
+    def snmp_set(self, *variables_to_set):
         """
         Perform an SNMP SET request on the switch.
 
@@ -54,7 +54,7 @@ class Switch(object):
         errorIndication, errorStatus, errorIndex, varBinds = self.command_generator.setCmd(
                 cmdgen.CommunityData('hpswitch', self.community, 1),
                 cmdgen.UdpTransportTarget((self.hostname, 161), timeout=8, retries=5),
-                *[(self._get_oid_for_managed_object_name(oid), value) for (oid, value) in var_binds]
+                *[(self._get_oid_for_managed_object_name(oid), value) for (oid, value) in variables_to_set]
                 )
 
     def snmp_get_subtree(self, oid):

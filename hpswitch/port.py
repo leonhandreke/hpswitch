@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import string
 
 from pysnmp.proto import rfc1902
 
@@ -38,7 +39,7 @@ class Port(object):
         """
         unit = string.ascii_uppercase.index(port_identifier[0].upper())
         port = int(port_identifier[1:])
-        return self._get_ifindex_for_port_location((unit, port))
+        return Port._get_ifindex_for_port_location((unit, port))
 
     _get_base_port_for_port_identifier = _get_ifindex_for_port_identifier
     _get_base_port_for_port_location = _get_ifindex_for_port_location
