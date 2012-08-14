@@ -23,6 +23,9 @@ class Port(object):
     # Index of the interface that this port is a member of.
     ifindex = property(lambda self: self.base_port)
 
+    # Port identifier corresponding to chassis labeling on the switch
+    identifier = property(lambda self: string.ascii_uppercase[self.base_port / 8] + unicode(self.base_port % 8))
+
     def _get_name(self):
         """
         Get the friendly name configured for this port.
