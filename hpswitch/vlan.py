@@ -164,13 +164,6 @@ class VLAN(object):
                 (("hpicfIpAddressRowStatus", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(6))
                 )
 
-
-    @staticmethod
-    def _get_port_list_port_value(port_list, port):
-        byte_position = (port.base_port - 1) / 8
-        bit_position = 7 - ((port.base_port - 1) % 8)
-        return (ord(port_list[byte_position]) & (1 << bit_position)) != 0
-
     @staticmethod
     def _set_port_list_port_status(port_list, port, status):
         """
@@ -189,11 +182,27 @@ class VLAN(object):
         new_port_list = port_list[:byte_position] + newbyte + port_list[(byte_position + 1):]
         return new_port_list
 
+    def _get_port_list_enabled_ports(self, port_list):
+        """
+        Return a list of Ports corresponding to the ports marked as enabled in the given `port_list`.
+        """
+        enabled_ports = []
+        byte_count = 0
+        for byte in port_list:
+            for bit in range(0, 8):
+                # Mask the byte with a bit field with only the bit we are interested in set
+                if (ord(byte) & (1 << (7 - bit))) != 0:
+                    enabled_ports.append(port.Port(self.switch, base_port=byte_count * 8 + (bit + 1)))
+            byte_count += 1
+        return enabled_ports
+
+
     def _get_tagged_ports(self):
         """
         Get a list of ports that have this VLAN configured as tagged.
         """
-        raise NotImplementedError
+        dot1qVlanStaticEgressPorts = self.switch.snmp_get(("dot1qVlanStaticEgressPorts", self.vid))
+        return self._get_port_list_enabled_ports(dot1qVlanStaticEgressPorts)
 
     tagged_ports = property(_get_tagged_ports)
 
@@ -218,7 +227,8 @@ class VLAN(object):
         """
         Get a list of ports that have this VLAN configured as untagged.
         """
-        raise NotImplementedError
+        dot1qVlanStaticUntaggedPorts = self.switch.snmp_get(("dot1qVlanStaticUntaggedPorts", self.vid))
+        return self._get_port_list_enabled_ports(dot1qVlanStaticUntaggedPorts)
 
     untagged_ports = property(_get_untagged_ports)
 
