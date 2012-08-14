@@ -4,7 +4,6 @@ import struct
 from pysnmp.proto import rfc1902
 import ipaddress
 
-import port
 
 class VLAN(object):
     """
@@ -186,6 +185,9 @@ class VLAN(object):
         """
         Return a list of Ports corresponding to the ports marked as enabled in the given `port_list`.
         """
+        # Import port.Port here to avoid circular import
+        from port import Port
+
         enabled_ports = []
         byte_count = 0
         for byte in port_list:

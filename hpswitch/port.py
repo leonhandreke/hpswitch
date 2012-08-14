@@ -3,6 +3,7 @@ import string
 
 from pysnmp.proto import rfc1902
 
+
 class Port(object):
     """
     Represents a physical port on a switch.
@@ -79,7 +80,9 @@ class Port(object):
         """
         Get the untagged VLAN configured on this port.
         """
-        return int(self.switch.snmp_get(("dot1qPvid", self.base_port)))
+        # Import vlan.VLAN here to avoid circular import
+        from vlan import VLAN
+        return VLAN(self.switch, int(self.switch.snmp_get(("dot1qPvid", self.base_port))))
 
     untagged_vlan = property(_get_untagged_vlan)
 
