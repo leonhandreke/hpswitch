@@ -7,48 +7,21 @@ class Port(object):
     """
     Represents a physical port on a switch.
     """
-    def __init__(self, switch, identifier):
+    def __init__(self, switch, identifier=None, base_port=None):
         """
         Construct a new Port with the given `identifier` located on the given `switch`.
         """
         self.switch = switch
-        self.identifier = identifier
-
-    #@staticmethod
-    #def _get_port_location_for_ifindex(ifindex):
-    #    """
-    #    Get the location of the port corresponding to the interface identified by `ifindex`.
-    #
-    #    Note: This assumption obviously only works for some interfaces (namely those directly corresponding to ports)
-    #    and is therefore very shaky.
-    #    """
-    #    return ((ifindex - 1)/52, (ifindex - 1) % 52 + 1)
-
-    @staticmethod
-    def _get_ifindex_for_port_location(port_location):
-        """
-        Get the ifindex of the interface that the port identified by `port_location` is a member of.
-        """
-        unit, port = port_location
-        return unit * 24 + port
-
-    @staticmethod
-    def _get_ifindex_for_port_identifier(port_identifier):
-        """
-        Get the ifindex of the interface that the port identified by `port_identifier` is a member of.
-        """
-        unit = string.ascii_uppercase.index(port_identifier[0].upper())
-        port = int(port_identifier[1:])
-        return Port._get_ifindex_for_port_location((unit, port))
-
-    _get_base_port_for_port_identifier = _get_ifindex_for_port_identifier
-    _get_base_port_for_port_location = _get_ifindex_for_port_location
+        # If an indentifier was given, infer the port index
+        if identifier != None:
+            unit = string.ascii_uppercase.index(identifier[0].upper())
+            port = int(identifier[1:])
+            self.base_port = unit * 24 + port
+        else:
+            self.base_port = base_port
 
     # Index of the interface that this port is a member of.
-    ifindex = property(lambda self: Port._get_ifindex_for_port_identifier(self.identifier))
-
-    # dot1dBasePortEntry index
-    base_port = property(lambda self: Port._get_base_port_for_port_identifier(self.identifier))
+    ifindex = property(lambda self: self.base_port)
 
     def _get_name(self):
         """
