@@ -16,6 +16,10 @@ class VLAN(object):
         self.vid = vid
         self.switch = switch
 
+        # Make sure that the VLAN is known on the switch
+        if not bool(self.switch.snmp_get(("dot1qVlanStaticRowStatus", self.vid))):
+            # create the VLAN on the switch: createAndGo == 4
+            self.switch.snmp_set(("dot1qVlanStaticRowStatus", self.vid), rfc1902.Integer(4))
 
     def _get_ifindex(self):
         # TODO: is this correct?
