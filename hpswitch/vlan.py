@@ -71,7 +71,7 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        ipv4_address_tuple = struct.unpack("4B", address.packed)
+        ipv4_address_tuple = struct.unpack("4B", address.ip.packed)
         self.switch.snmp_set(
                 (("ipv4InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
                 # hpicfIpv4InterfaceDhcpEnable off
@@ -90,7 +90,7 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv4Interface.
         """
-        ipv4_address_tuple = struct.unpack("4B", address.packed)
+        ipv4_address_tuple = struct.unpack("4B", address.ip.packed)
         self.switch.snmp_set(
                 # hpicfIpAddressRowStatus destroy 6
                 (("hpicfIpAddressRowStatus", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(6))
@@ -139,7 +139,7 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        ipv6_address_tuple = struct.unpack("16B", address.packed)
+        ipv6_address_tuple = struct.unpack("16B", address.ip.packed)
         self.switch.snmp_set(
                 (("ipv6InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
                 #(("hpicfIpv4InterfaceDhcpEnable", self.ifindex), rfc1902.Integer(2)),
@@ -157,7 +157,7 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
-        ipv6_address_tuple = struct.unpack("16B", address.packed)
+        ipv6_address_tuple = struct.unpack("16B", address.ip.packed)
         self.switch.snmp_set(
                 # hpicfIpAddressRowStatus destroy 6
                 (("hpicfIpAddressRowStatus", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(6))
