@@ -82,7 +82,7 @@ class VLAN(object):
                 (("hpicfIpv4InterfaceDhcpEnable", self.ifindex), rfc1902.Integer(2)),
                 (("hpicfIpAddressPrefixLength", self.ifindex, 1, 4) + ipv4_address_tuple,
                     rfc1902.Gauge32(address.prefixlen)),
-                # hpicfIpAddressType IPv4
+                # hpicfIpAddressType unicast
                 (("hpicfIpAddressType", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(1)),
                 # hpicfIpAddressRowStatus createAndGo 4
                 (("hpicfIpAddressRowStatus", self.ifindex, 1, 4) + ipv4_address_tuple, rfc1902.Integer(4))
@@ -146,10 +146,11 @@ class VLAN(object):
         ipv6_address_tuple = struct.unpack("16B", address.ip.packed)
         self.switch.snmp_set(
                 (("ipv6InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
-                #(("hpicfIpv4InterfaceDhcpEnable", self.ifindex), rfc1902.Integer(2)),
+                # Set enabled and configure a link-local address
+                (("hpicfIpv6InterfaceCfgEnableStatus", self.ifindex), rfc1902.Integer(1)),
                 (("hpicfIpAddressPrefixLength", self.ifindex, 2, 16) + ipv6_address_tuple,
                     rfc1902.Gauge32(address.prefixlen)),
-                # hpicfIpAddressType IPv6
+                # hpicfIpAddressType unicast
                 (("hpicfIpAddressType", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(1)),
                 # hpicfIpAddressRowStatus createAndGo 4
                 (("hpicfIpAddressRowStatus", self.ifindex, 2, 16) + ipv6_address_tuple, rfc1902.Integer(4))
