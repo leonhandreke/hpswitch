@@ -143,11 +143,17 @@ class VLAN(object):
 
         `address` should be of type ipaddress.IPv6Interface.
         """
+        # TODO: Convert a HP-ICF-IPCONFIG with this OID to pysnmp format
+        hpicfIpv6InterfaceCfgEnableStatus = (1, 3, 6, 1, 4, 1, 11, 2, 14, 11, 1, 10, 3, 2, 1, 1, 6)
+        hpicfIpv6InterfaceManual = (1, 3, 6, 1, 4, 1, 11, 2, 14, 11, 1, 10, 3, 2, 1, 1, 2)
+
         ipv6_address_tuple = struct.unpack("16B", address.ip.packed)
         self.switch.snmp_set(
-                (("ipv6InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
                 # Set enabled and configure a link-local address
-                (("hpicfIpv6InterfaceCfgEnableStatus", self.ifindex), rfc1902.Integer(1)),
+                (hpicfIpv6InterfaceCfgEnableStatus + (self.ifindex, ), rfc1902.Integer(1)),
+                # Enable manual address configuration
+                (hpicfIpv6InterfaceManual + (self.ifindex, ), rfc1902.Integer(1)),
+                (("ipv6InterfaceEnableStatus", self.ifindex), rfc1902.Integer(1)),
                 (("hpicfIpAddressPrefixLength", self.ifindex, 2, 16) + ipv6_address_tuple,
                     rfc1902.Gauge32(address.prefixlen)),
                 # hpicfIpAddressType unicast
