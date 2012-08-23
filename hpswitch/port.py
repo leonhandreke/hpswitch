@@ -27,29 +27,25 @@ class Port(object):
     # Port identifier corresponding to chassis labeling on the switch
     identifier = property(lambda self: string.ascii_uppercase[self.base_port / 8] + unicode(self.base_port % 8))
 
-    def _get_name(self):
+    def _get_alias(self):
         """
         Get the friendly name configured for this port.
         """
-        raise NotImplementedError
+        ifAlias = self.switch.snmp_get(("ifAlias", self.ifindex))
+        return unicode(ifAlias)
 
-    def _set_name(self, value):
+    def _set_alias(self, value):
         """
         Configure the name `value` as the friendly name for this port.
         """
         # Make sure that the name is legal according to the allowed interface names detailed in section 2-23 of the HP
         # Management and Configuration Guide
         assert(all(map(lambda letter: letter in (string.ascii_letters + string.digits), value)))
-        # Issue the commands on the switch to set the new name.
-        raise NotImplementedError
+        # Set the new alias on the switch
+        self.switch.snmp_set((("ifAlias", self.ifindex), rfc1902.OctetString(value)))
 
-    def _del_name(self):
-        """
-        Deconfigure the friendly name on this port.
-        """
-        raise NotImplementedError
 
-    name = property(_get_name, _set_name, _del_name)
+    alias = property(_get_alias, _set_alias)
 
     def _get_enabled(self):
         """
