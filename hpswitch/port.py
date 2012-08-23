@@ -25,7 +25,7 @@ class Port(object):
     ifindex = property(lambda self: self.base_port)
 
     # Port identifier corresponding to chassis labeling on the switch
-    identifier = property(lambda self: string.ascii_uppercase[self.base_port / 8] + unicode(self.base_port % 8))
+    identifier = property(lambda self: string.ascii_uppercase[self.base_port / 24] + unicode(self.base_port % 24))
 
     def _get_alias(self):
         """
