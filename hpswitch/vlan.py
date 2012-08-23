@@ -4,6 +4,7 @@ import struct
 from pysnmp.proto import rfc1902
 import ipaddress
 
+from port import Port
 
 class VLAN(object):
     """
@@ -205,7 +206,7 @@ class VLAN(object):
             for bit in range(0, 8):
                 # Mask the byte with a bit field with only the bit we are interested in set
                 if (ord(byte) & (1 << (7 - bit))) != 0:
-                    enabled_ports.append(port.Port(self.switch, base_port=byte_count * 8 + (bit + 1)))
+                    enabled_ports.append(Port(self.switch, base_port=byte_count * 8 + (bit + 1)))
             byte_count += 1
         return enabled_ports
 
