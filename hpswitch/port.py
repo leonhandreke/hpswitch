@@ -65,7 +65,7 @@ class Port(object):
         Set the admin status of this port.
         """
         # ifAdminStatus 1 means up, 2 means down
-        self.switch.snmp_set(("ifAdminStatus", self.ifindex), rfc1902.Integer(1 if value else 2))
+        self.switch.snmp_set((("ifAdminStatus", self.ifindex), rfc1902.Integer(1 if value else 2)))
 
     enabled = property(_get_enabled, _set_enabled)
 
