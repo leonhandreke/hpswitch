@@ -21,6 +21,9 @@ class Port(object):
         else:
             self.base_port = base_port
 
+    def __unicode__(self):
+        return u"{0} on {1}".format(self.identifier, self.switch.hostname)
+
     # Index of the interface that this port is a member of.
     ifindex = property(lambda self: self.base_port)
 
