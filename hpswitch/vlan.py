@@ -251,6 +251,10 @@ class VLAN(object):
     untagged_ports = property(_get_untagged_ports)
 
     def _set_port_untagged_status(self, port, status):
+        # To add a port to a VLAN untagged, it first needs to be added as tagged
+        if status == True:
+            self.add_tagged_port(port)
+        # Add the port to the list of untagged ports for this VLAN
         dot1qVlanStaticUntaggedPorts = self.switch.snmp_get(("dot1qVlanStaticUntaggedPorts", self.vid))
         new_untagged_port_list = VLAN._set_port_list_port_status(dot1qVlanStaticUntaggedPorts, port, status)
         self.switch.snmp_set((("dot1qVlanStaticUntaggedPorts", self.vid), rfc1902.OctetString(new_untagged_port_list)))
