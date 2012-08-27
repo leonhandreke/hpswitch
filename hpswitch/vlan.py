@@ -251,8 +251,9 @@ class VLAN(object):
     untagged_ports = property(_get_untagged_ports)
 
     def _set_port_untagged_status(self, port, status):
-        # To add a port to a VLAN untagged, it first needs to be added as tagged
+        previous_untagged_vlan = port.untagged_vlan
         if status == True:
+            # To add a port to a VLAN untagged, it first needs to be added as tagged
             self.add_tagged_port(port)
         # Add the port to the list of untagged ports for this VLAN
         dot1qVlanStaticUntaggedPorts = self.switch.snmp_get(("dot1qVlanStaticUntaggedPorts", self.vid))
@@ -261,6 +262,9 @@ class VLAN(object):
         # Only set the pvid if the port is being added to the VLAN
         if status == True:
             self.switch.snmp_set((("dot1qPvid", port.base_port), rfc1902.Gauge32(self.vid)))
+            # Remove the port from the VLAN that it belonged to before
+            if self != previous_untagged_vlan:
+                previous_untagged_vlan.remove_untagged_port(port)
         # If the port was just removed from dot1qVlanStaticUntaggedPorts, it is still in dot1qVlanStaticEgressPorts and
         # therefore still egresses this VLAN tagged
         if status == False:
