@@ -8,9 +8,9 @@ class Port(object):
     """
     Represents a physical port on a switch.
     """
-    def __init__(self, switch, identifier=None, base_port=None):
+    def __init__(self, switch, identifier=None, base_port=None, alias=None):
         """
-        Construct a new Port with the given `identifier` located on the given `switch`.
+        Construct a new Port with the given `identifier`, `base_port` or current `alias` located on the given `switch`.
         """
         self.switch = switch
         # If an indentifier was given, infer the port index
@@ -18,8 +18,25 @@ class Port(object):
             unit = string.ascii_uppercase.index(identifier[0].upper())
             port = int(identifier[1:])
             self.base_port = unit * 24 + port
-        else:
+        elif base_port != None:
             self.base_port = base_port
+        elif alias != None:
+            # Get all aliases and look for the interface with the given alias
+            ifAliases = self.switch.snmp_get_subtree(("ifAlias", ))
+            # ifAliases is index by ifIndex, which is the same as dot1dBasePort for Ports
+            matching_ifindexes = map(lambda oid: oid[0][-1],
+                    filter(
+                        lambda result: unicode(result[1]) == alias,
+                        ifAliases)
+                    )
+            if len(matching_ifindexes) > 1:
+                raise PortInstantiationError("Multiple ports with matching alias exist")
+            elif len(matching_ifindexes) == 1:
+                self.base_port = matching_ifindexes[0]
+            elif len(matching_ifindexes) == 0:
+                raise PortInstantiationError("No port with matching alias exists")
+        else:
+            raise PortInstantiationError("Port insufficiently specified")
 
     def __unicode__(self):
         return u"{0} on {1}".format(self.identifier, self.switch.hostname)
@@ -95,3 +112,7 @@ class Port(object):
         raise NotImplementedError
 
     tagged_vlans = property(_get_tagged_vlans)
+
+
+class PortInstantiationError(Exception):
+    pass
