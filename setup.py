@@ -8,5 +8,5 @@ setup(name='hpswitch',
         packages=['hpswitch', ],
         url='https://github.com/leonhandreke/hpswitch',
         license="MIT License",
-        requires=['pysnmp']
+        install_requires=['pysnmp>=4.2.3', 'pysnmp-mibs>=0.1.4']
         )
