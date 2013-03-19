@@ -31,6 +31,9 @@ class VLAN(object):
     def __eq__(self, other):
         return self.vid == other.vid and self.switch == other.switch
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def _get_name(self):
         """
         The name configured for the VLAN.
