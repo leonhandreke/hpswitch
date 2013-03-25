@@ -266,7 +266,7 @@ class VLAN(object):
         if status == True:
             self.switch.snmp_set((("dot1qPvid", port.base_port), rfc1902.Gauge32(self.vid)))
             # Remove the port from the VLAN that it belonged to before
-            if self != previous_untagged_vlan:
+            if previous_untagged_vlan is not None and self != previous_untagged_vlan:
                 previous_untagged_vlan.remove_untagged_port(port)
         # If the port was just removed from dot1qVlanStaticUntaggedPorts, it is still in dot1qVlanStaticEgressPorts and
         # therefore still egresses this VLAN tagged

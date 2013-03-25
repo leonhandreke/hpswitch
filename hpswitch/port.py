@@ -44,6 +44,9 @@ class Port(object):
     def __eq__(self, other):
         return self.switch == other.switch and self.base_port == other.base_port
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     # Index of the interface that this port is a member of.
     ifindex = property(lambda self: self.base_port)
 
@@ -101,7 +104,13 @@ class Port(object):
         """
         # Import vlan.VLAN here to avoid circular import
         from vlan import VLAN
-        return VLAN(self.switch, int(self.switch.snmp_get(("dot1qPvid", self.base_port))))
+        untagged_vlan = VLAN(self.switch, int(self.switch.snmp_get(("dot1qPvid", self.base_port))))
+        # If no untagged VLAN is configured, dot1qPvid is still DEFAULT_VLAN,
+        # so check if the port is really in the VLAN
+        if self in untagged_vlan.untagged_ports:
+            return untagged_vlan
+        else:
+            return None
 
     untagged_vlan = property(_get_untagged_vlan)
 
