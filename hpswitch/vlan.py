@@ -53,15 +53,7 @@ class VLAN(object):
         Get the IPv4 addresses configured configured for this VLAN.
         """
         # Get all address Entries in hpicfIpAddressTable
-        hpicfIpAddressEntries = self.switch.snmp_get_subtree(("hpicfIpAddressEntry", ))
-        vlan_ipv4_address_prefix_length_entries = filter(
-                # oid[17] contains the ifindex
-                lambda result: result[0][17] == self.ifindex
-                # oid[18] is 1 for IPv4 addresses
-                and result[0][18] == 1
-                # hpicfIpAddressPrefixLength is oid[16] == 3
-                and result[0][16] == 3,
-                hpicfIpAddressEntries)
+        vlan_ipv4_address_prefix_length_entries = self.switch.snmp_get_subtree(("hpicfIpAddressPrefixLength", self.ifindex, 1))
 
         ipv4_addresses = []
         for result in vlan_ipv4_address_prefix_length_entries:
@@ -109,15 +101,7 @@ class VLAN(object):
         Get the IPv6 addresses configured for this VLAN.
         """
         # Get all address Entries in hpicfIpAddressTable
-        hpicfIpAddressEntries = self.switch.snmp_get_subtree(("hpicfIpAddressEntry", ))
-        vlan_ipv6_address_prefix_length_entries = filter(
-                # oid[17] contains the ifindex
-                lambda result: result[0][17] == self.ifindex
-                # oid[18] is 2 for IPv6 addresses
-                and result[0][18] == 2
-                # hpicfIpAddressPrefixLength is oid[16] == 3
-                and result[0][16] == 3,
-                hpicfIpAddressEntries)
+        vlan_ipv6_address_prefix_length_entries = self.switch.snmp_get_subtree(("hpicfIpAddressPrefixLength", self.ifindex, 2))
 
         ipv6_addresses = []
         for result in vlan_ipv6_address_prefix_length_entries:
