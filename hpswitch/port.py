@@ -3,6 +3,21 @@ import string
 
 from pysnmp.proto import rfc1902
 
+def get_port_list_enabled_ports(switch, port_list):
+    """
+    Return a list of Ports corresponding to the ports marked as enabled in the given `port_list`.
+    """
+
+    enabled_ports = []
+    byte_count = 0
+    for byte in port_list:
+        for bit in range(0, 8):
+            # Mask the byte with a bit field with only the bit we are interested in set
+            if (ord(byte) & (1 << (7 - bit))) != 0:
+                enabled_ports.append(Port(switch, base_port=byte_count * 8 + (bit + 1)))
+        byte_count += 1
+    return enabled_ports
+
 
 class Port(object):
     """
@@ -118,7 +133,20 @@ class Port(object):
         """
         Get a list of the tagged VLANs configured on this port.
         """
-        raise NotImplementedError
+        from vlan import VLAN
+        egress_ports = self.switch.snmp_get_subtree(("dot1qVlanStaticEgressPorts",))
+        tagged_vlans = []
+        untagged_vlan = self.untagged_vlan
+
+        for egress_port in egress_ports:
+            oid, port_list = egress_port
+            vlan_id = oid[-1]
+
+            for port in get_port_list_enabled_ports(self.switch, port_list):
+                if self == port and (untagged_vlan is None or vlan_id != untagged_vlan.vid):
+                    tagged_vlans.append(VLAN(self.switch, vlan_id))
+
+        return tagged_vlans
 
     tagged_vlans = property(_get_tagged_vlans)
 

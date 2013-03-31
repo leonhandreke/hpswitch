@@ -184,19 +184,8 @@ class VLAN(object):
         """
         Return a list of Ports corresponding to the ports marked as enabled in the given `port_list`.
         """
-        # Import port.Port here to avoid circular import
-        from port import Port
-
-        enabled_ports = []
-        byte_count = 0
-        for byte in port_list:
-            for bit in range(0, 8):
-                # Mask the byte with a bit field with only the bit we are interested in set
-                if (ord(byte) & (1 << (7 - bit))) != 0:
-                    enabled_ports.append(Port(self.switch, base_port=byte_count * 8 + (bit + 1)))
-            byte_count += 1
-        return enabled_ports
-
+        from port import get_port_list_enabled_ports
+        return get_port_list_enabled_ports(self.switch, port_list)
 
     def _get_tagged_ports(self):
         """
