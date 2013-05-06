@@ -116,3 +116,23 @@ class Switch(object):
         Remove the static IPv6 route `remove_route` from the switch configuration.
         """
         pass
+
+    def get_ports(self):
+        """
+        Get all ports of this switch
+
+        Returns Port-objects
+        """
+        from hpswitch.port import Port
+        base_ports = self.snmp_get_subtree(("dot1dBasePort",))
+        return [Port(self, base_port=int(p[1])) for p in base_ports]
+
+    def get_vlans(self):
+        """
+        Get all vlans on this switch
+
+        Returns VLAN-objects
+        """
+        from hpswitch.vlan import VLAN
+        vlans = self.snmp_get_subtree(("dot1qVlanStaticRowStatus",))
+        return [VLAN(self, int(v[0][-1])) for v in vlans]
