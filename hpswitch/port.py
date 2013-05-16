@@ -88,6 +88,15 @@ class Port(object):
 
     alias = property(_get_alias, _set_alias)
 
+    def _get_description(self):
+        """
+        Get descriptive name for this port.
+        """
+        ifDescr = self.switch.snmp_get(("ifDescr", self.ifindex))
+        return unicode(ifDescr)
+
+    description = property(_get_description)
+
     def _get_enabled(self):
         """
         Get the admin status of this port.
