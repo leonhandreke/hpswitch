@@ -119,9 +119,9 @@ class Switch(object):
 
     def get_ports(self):
         """
-        Get all ports of this switch
+        Get all ports of this switch.
 
-        Returns Port-objects
+        Returns Port objects.
         """
         from hpswitch.port import Port
         base_ports = self.snmp_get_subtree(("dot1dBasePort",))
@@ -129,9 +129,9 @@ class Switch(object):
 
     def get_vlans(self):
         """
-        Get all vlans on this switch
+        Get all VLANs currently configured on this switch.
 
-        Returns VLAN-objects
+        Returns VLAN objects.
         """
         from hpswitch.vlan import VLAN
         vlans = self.snmp_get_subtree(("dot1qVlanStaticRowStatus",))
